@@ -1,0 +1,508 @@
+#!/usr/bin/perl
+###############################################################################
+# convert a text file for a text file suitable for SCDBook and an asm file
+#    that provides information about the text file (chapter locations, page
+#    locations, etc)
+# input special file markup:
+#    #scdbook setbook
+#    #scdbook settoc
+#    #scdbook settitle(The Time Machine)
+#    #scdbook setauthor(H. G. Wells)
+#    #scdbook setpublished(1895)
+#    #scdbook setscenebreak(***)
+#    #scdbook setscreenwidth(36)
+#    #scdbook setscreenheight(25)
+#    #scdbook settab(   )
+#    #scdbook setchronologicalstart(Volume 0)
+#    #scdbook setchronologicalbefore(Volume 6)
+#    #scdbook setchronologicalafter(Volume 8)
+#    #scdbook gutenbergprefix
+#    #scdbook chapterbreak
+#    #scdbook pagebreak
+#    #scdbook scenebreak
+#    #scdbook verbosestart
+#      note: no #scdbook command except #scdbook verboseend are recognized in
+#        verbosestart command
+#    #scdbook verboseend
+#    #scdbook commentstart
+#      note: no #scdbook command except #scdbook commentend are recognized in
+#        commentstart command
+#    #scdbook commentend
+#    #scdbook comment any text such as format changes
+###############################################################################
+
+use strict;
+use warnings;
+
+if ( $#ARGV < 1 ) {
+    die "\nscdbookformat <prefix> [chapters...]\n\n";
+}
+
+# useful customizable variables (can be set within marked up file)
+
+# 0 means normal book, 1 means TOC
+my $asmMode = 0;
+
+# the desired newline for the TXT files, doesn't matter to SCD
+# more of a preference for people that open the TXT files on a computer
+#    DOS/Windows   \x0D\x0A
+#    Mac OS < 10   \x0D
+#    *nix          \x0A
+my $newLine = "\x0A";
+
+# limits of the SCD display (width reduced by 2 tiles on each side,
+# height reduced by 1 tile on each side, and height reduced by one for the
+# current page number)
+my $screenWidth = 36;
+my $screenHeight = 25;
+
+# desire a small tab on the SCD, and avoid amgibious \t character
+my $tab = (' 'x3);
+
+my $removeUnderscores = 1;
+my $removeHTML = 1;
+
+# book specific variables
+my $title = '';
+my $author = '';
+my $published = '';
+my $scenebreak = '***';
+my $chronologicalStart = '';
+my $chronologicalBefore = '';
+my $chronologicalAfter = '';
+
+###############################################################################
+
+# the output file prefixes
+my $prefix = shift @ARGV;
+
+# the input files
+my @files = @ARGV;
+
+# the output filenames
+my $fileText = (uc($prefix) eq $prefix) ? ($prefix.'.TXT') : ($prefix.'.txt');
+my $fileAsm  = (uc($prefix) eq $prefix) ? ($prefix.'.ASM') : ($prefix.'.asm');
+
+# the newly SCD formatted text
+my $text = '';
+
+# the byte offsets for each page start
+my $offset = 0;
+my @offsetsPages = ( 0 );
+
+# the pages for each chapter start
+my $page = 0;
+my @pagesChapters = ( 0 );
+
+my $fileIndexLast = $#files;
+for ( my $fileIndex = 0; $fileIndex <= $fileIndexLast; $fileIndex++ ) {
+    my $file = $files[$fileIndex];
+    my @lines;
+    if ( open( FILE, $file ) ) {
+	my $lineNumber = 0;
+	my $firstChapterLine = 1;
+	my $lineCurrent = '';
+	while ( my $line = <FILE> ) {
+	    chomp $line;
+	    $lineNumber++;
+	    if ( $line =~ s/^\s*^#\s*scdbook\s+// ) {
+		# scdbook markup
+		if ( $line =~ /^chapterbreak\s*$/ ) {
+		    # add unfinished paragraph/verse
+		    if ( $lineCurrent ne '' ) {
+			push @lines, $lineCurrent;
+		    }
+		    # make sure we have empty line between chapters
+		    if ( $#lines >= 0 && $lines[$#lines] ne '' ) {
+			push @lines, '';
+		    }
+		    &AddChapter(@lines);
+		    @lines = ();
+		    $firstChapterLine = 1;
+		    $lineCurrent = '';
+		} elsif ( $line =~ /^pagebreak\s*$/ ) {
+		    # add unfinished paragraph/verse
+		    if ( $lineCurrent ne '' ) {
+			push @lines, $lineCurrent;
+		    }
+		    push @lines, '#scdbook pagebreak';
+		    $lineCurrent = '';
+		} elsif ( $line =~ /^setbook$/ ) {
+		    $asmMode = 0;
+		} elsif ( $line =~ /^settoc$/ ) {
+		    $asmMode = 1;
+		} elsif ( $line =~ /^settitle\(([^\(\)]*)\)\s*$/ ) {
+		    $title = $1;
+		} elsif ( $line =~ /^setauthor\(([^\(\)]*)\)\s*$/ ) {
+		    $author = $1;
+		} elsif ( $line =~ /^setpublished\(([^\(\)]*)\)\s*$/ ) {
+		    $published = $1;
+		} elsif ( $line =~ /^setscenebreak\(([^\(\)]*)\)\s*$/ ) {
+		    $scenebreak = $1;
+		} elsif ( $line =~ /^setscreenwidth\(([^\(\)]*)\)\s*$/ ) {
+		    $screenWidth = $1;
+		} elsif ( $line =~ /^setscreenheight\(([^\(\)]*)\)\s*$/ ) {
+		    $screenHeight = $1;
+		} elsif ( $line =~ /^settab\(([^\(\)]*)\)\s*$/ ) {
+		    $tab = $1;
+		} elsif ( $line =~ /^setchronologicalstart\(([^\(\)]*)\)\s*$/ ) {
+		    $chronologicalStart = $1;
+		} elsif ( $line =~ /^setchronologicalbefore\(([^\(\)]*)\)\s*$/ ) {
+		    $chronologicalBefore = $1;
+		} elsif ( $line =~ /^setchronologicalafter\(([^\(\)]*)\)\s*$/ ) {
+		    $chronologicalAfter = $1;
+		} elsif ( $line =~ /^gutenbergprefix\s*$/ ) {
+		    # make a consistent header for gutenberg books
+		    # their inconsistency bothers me...
+		    if ( $title eq '' ) {
+			die "scdbook gutenbergprefix requires title to be set\n";
+		    }
+		    if ( ! $firstChapterLine || $lineCurrent ne '' ) {
+			push @lines, $lineCurrent;
+		    }
+		    # make sure we have empty line between
+		    if ( $#lines >= 0 && $lines[$#lines] ne '' ) {
+			push @lines, '';
+		    }
+		    my $titleAuthor = $title;
+		    if ( $author ne '' ) {
+			$titleAuthor .= ', by ' . $author;
+		    }
+		    push @lines, "The Project Gutenberg EBook of $titleAuthor";
+		    push @lines, '';
+		    push @lines, 'This eBook is for the use of anyone anywhere at no cost and with almost no restrictions whatsoever.  You may copy it, give it away or re-use it under the terms of the Project Gutenberg License included with this eBook or online at www.gutenberg.org';
+		    push @lines, '';
+		    push @lines, 'This eBook has been formatted to be displayed using the Sega CD.';
+		    if ( $published ne '' ) {
+			push @lines, '';
+			push @lines, "Originally published in $published.";
+		    }
+		    if ( $chronologicalBefore ne '' ||
+			 $chronologicalAfter ne '' ) {
+			push @lines, '';
+			my $str = '';
+			if ( $chronologicalStart ne '' ) {
+			    $str .= ' ' if $str ne '';
+			    $str .= "This book is in a series started by $chronologicalStart.";
+			}
+			# go through each type so it is more concise
+			if ( $chronologicalBefore ne '' ) {
+			    if ( $chronologicalStart ne '' ) {
+				if ( $chronologicalAfter ne '' ) {
+				    $str = "This book is in a series started by $chronologicalStart, preceded by $chronologicalBefore, and followed by $chronologicalAfter.";
+				} else {
+				    $str = "This book is in a series started by $chronologicalStart, and preceded by $chronologicalBefore.";
+				}
+			    } else {
+				if ( $chronologicalAfter ne '' ) {
+				    $str = "This book is in a series preceded by $chronologicalBefore, and followed by $chronologicalAfter.";
+				} else {
+				    $str = "This book is in a series preceded by $chronologicalBefore.";
+				}
+			    }
+			} else {
+			    $str = "This book is in a series followed by $chronologicalAfter.";
+			}
+			push @lines, $str;
+		    }
+		    $firstChapterLine = 0;
+		    $lineCurrent = '';
+		} elsif ( $line =~ /^scenebreak\s*$/ ) {
+		    if ( $lineCurrent ne '' ) {
+			push @lines, $lineCurrent;
+		    }
+		    # make sure we have empty line between chapters
+		    if ( $#lines >= 0 && $lines[$#lines] ne '' ) {
+			push @lines, '';
+		    }
+		    push @lines, $scenebreak;
+		    $firstChapterLine = 0;
+		    $lineCurrent = '';
+		} elsif ( $line =~ /^verbosestart\s*$/ ) {
+		    if ( $lineCurrent ne '' ) {
+			push @lines, $lineCurrent;
+		    }
+		    while ( $line = <FILE> ) {
+			$lineNumber++;
+			chomp $line;
+			if ( $line =~ /^\s*^#\s*scdbook\s+verboseend\s*$/ ) {
+			    last;
+			} else {
+			    push @lines, $line;
+			}
+		    }
+		    if ( $line !~ /^\s*^#\s*scdbook\s+verboseend\s*$/ ) {
+			die "Bad #scdbook verbosestart did not find verboseend\n";
+		    }
+		} elsif ( $line =~ /^commentstart\s*$/ ) {
+		    while ( $line = <FILE> ) {
+			$lineNumber++;
+			chomp $line;
+			if ( $line =~ /^\s*^#\s*scdbook\s+commentend\s*$/ ) {
+			    last;
+			}
+		    }
+		    if ( $line !~ /^\s*^#\s*scdbook\s+commentend\s*$/ ) {
+			die "Bad #scdbook commentstart did not find commentend\n";
+		    }
+		} elsif ( $line !~ /^comment\s/ ) {
+		    die "Bad #scdbook markup: $line\n";
+		}
+	    } else {
+		# do not support unicode characters at this time...
+		if ( $removeUnderscores ) {
+		    $line =~ s/_//g;
+		}
+		if ( $removeHTML ) {
+		    $line =~ s/<\/?[bi]>//g;
+		}
+		$line =~ s/\xC2\xA3/#/g;
+		$line =~ s/\xC3[\x80-\x85]/A/g;
+		$line =~ s/\xC3[\x86]/AE/g;
+		$line =~ s/\xC3[\x87]/C/g;
+		$line =~ s/\xC3[\x88-\x8B]/E/g;
+		$line =~ s/\xC3[\x8C-\x8F]/I/g;
+		$line =~ s/\xC3[\x91]/N/g;
+		$line =~ s/\xC3[\x92-\x96]/O/g;
+		$line =~ s/\xC3[\x99-\x9C]/U/g;
+		$line =~ s/\xC3[\x9D]/Y/g;
+		$line =~ s/\xC3[\xA0-\xA5]/a/g;
+		$line =~ s/\xC3[\xA6]/ae/g;
+		$line =~ s/\xC3[\xA7]/c/g;
+		$line =~ s/\xC3[\xA8-\xAB]/e/g;
+		$line =~ s/\xC3[\xAC-\xAF]/i/g;
+		$line =~ s/\xC3[\xB1]/n/g;
+		$line =~ s/\xC3[\xB2-\xB6]/o/g;
+		$line =~ s/\xC3[\xB9-\xBC]/u/g;
+		$line =~ s/\xC3[\xBD]/y/g;
+		if ( $line =~ /\xC3(.)/ ) {
+		    print STDERR "Bad character: 0xC3".sprintf("%2.2X",ord($1)).": file $file, line $lineNumber\n";
+		} elsif ( $line =~ /([^\x0A\x0D\x20-\x7E])/ ) {
+		    print STDERR "Bad character: 0x".sprintf("%2.2X",ord($1)).": file $file, line $lineNumber\n";
+		}
+		# regular text, determine if tabbed
+		my $tabbed = ( $line =~ /^\s+\S/ );
+		$line =~ s/^\s+//g;
+		$line =~ s/\s+$//g;
+		if ( $tabbed ) {
+		    # check if should push line
+		    if ( ! $firstChapterLine ||
+			 $lineCurrent ne '' ) {
+			$firstChapterLine = 0;
+			push @lines, $lineCurrent;
+		    }
+		    $lineCurrent = $tab.$line;
+		} elsif ( $line eq '' ) {
+		    # check if should push line
+		    if ( $lineCurrent ne '' ) {
+			# add current paragraph/verse so can indicate
+			# empty line
+			$firstChapterLine = 0;
+			push @lines, $lineCurrent;
+		    }
+		    $lineCurrent = '';
+		} else {
+		    # non-tabbed text (may start or be in middle of paragraph)
+		    if ( $lineCurrent ne '' ) {
+			# add to current paragraph
+			$lineCurrent .= ' ';
+		    } elsif ( ! $firstChapterLine ) {
+			# add empty line if not first line of chapter
+			$firstChapterLine = 0;
+			push @lines, $lineCurrent;
+		    }
+		    $lineCurrent .= $line;
+		}
+	    }
+	}
+
+	# add unfinished paragraph/verse
+	if ( $lineCurrent ne '' ) {
+	    push @lines, $lineCurrent;
+	}
+	$lineCurrent = '';
+    }
+
+    close FILE;
+
+    # make sure we have empty line between chapters
+    # but no extra line at the end of the book
+    if ( $fileIndex < $fileIndexLast &&
+	 $#lines >= 0 && $lines[$#lines] ne '' ) {
+	push @lines, '';
+    }
+
+    &AddChapter(@lines);
+}
+
+# check for characters not supported by SCDBook
+if ( $text =~ /([^\x0A\x0D\x20-\x7E])/ ) {
+    die "Bad character: 0x".sprintf("%2.2X",ord($1))."\n";
+}
+
+my $chapters = $#pagesChapters;
+my $pages = $#offsetsPages;
+
+# TODO determine ASM without directly writing it...
+
+open( ASM, '>'.$fileAsm );
+
+print ASM "${prefix}BookDataStart:\n";
+
+my $length = 0;
+
+if ( $asmMode == 0 ) {
+    # length of this file once assembled
+    my $chapterLength = 2 * 6 + 2 * ( $chapters + 1 );
+    $length = $chapterLength + 4 * ( $pages + 1 );
+    # determine the sector of the book since it start after the header info
+    my $textSectorStart = int( ( $length + 0x800 - 1 ) / 0x800 );
+
+    if ( $chapterLength > 0x10000 ) {
+	die "Unacceptable chapter book information length\n";
+    }
+
+    print ASM "\t;; BookDataBookIndex\n";
+    print ASM "\tdc.w\t0\n";
+    print ASM "\t;; BookDataBookPart\n";
+    print ASM "\tdc.w\t0\n";
+    print ASM "\t;; BookDataPageTableOffset\n";
+    print ASM "\tdc.w\t${prefix}PageTableStart-${prefix}BookDataStart\n";
+    print ASM "\t;; BookDataTextTableSectorStart\n";
+    print ASM "\tdc.w\t$textSectorStart\n";
+    print ASM "\t;; BookDataChapterCount\n";
+    print ASM "\tdc.w\t$chapters\n";
+    print ASM "\t;; BookDataPageCount\n";
+    print ASM "\tdc.w\t$pages\n";
+} elsif ( $asmMode == 1 ) {
+    # length of this file once assembled
+    $length = 2 * 2 + 4 * ( $pages + 1 );
+
+    print ASM "\t;; TOCDataPageTableOffset\n";
+    print ASM "\tdc.w\t$pages\n";
+    print ASM "\t;; TOCDataTextTableByteStart\n";
+    print ASM "\tdc.w\t$length\n";
+} else {
+    die "bad asmMode: $asmMode\n";
+}
+
+if ( $length > 32 * 0x800 ) {
+    print STDERR "Book information is getting very large and will be annoying when travelling in both directions\n";
+} elsif ( $length > 63 * 0x800 ) {
+    die "Unacceptable book information length\n";
+}
+
+if ( $asmMode == 0 ) {
+    print ASM "${prefix}ChapterTableStart:\n";
+    for ( my $chapter = 0; $chapter <= $chapters; $chapter++ ) {
+	my $page = $pagesChapters[$chapter];
+	# actually make a pseudo last chapter of the last page
+	# will make an extra chapter if last chapter is only one page long
+	if ( $chapter == $chapters ) {
+	    $page--;
+	}
+	print ASM "\tdc.w\t$page\n";
+    }
+}
+
+print ASM "${prefix}PageTableStart:\n";
+foreach my $offset (@offsetsPages) {
+    print ASM "\tdc.l\t$offset\n";
+}
+
+print ASM "${prefix}BookDataEnd:\n";
+
+close ASM;
+
+open( TEXT, '>'.$fileText );
+print TEXT $text;
+close TEXT;
+
+
+
+sub AddChapter {
+    my $row = 0;
+    my $pageCurrent = '';
+    foreach my $line (@_) {
+	my $p = $line;
+	if ( $p eq '#scdbook pagebreak' ) {
+	    &AddPage($pageCurrent);
+	    $pageCurrent = '';
+	    $row = 0;
+	    next;
+	}
+	my $lLen = length($p);
+	while ( $lLen > $screenWidth ) {
+	    my $i = rindex($p,' ',$screenWidth);
+	    # for ' ', can replace with new line, but '-' and '/'
+	    # must still have the '-' and '/' respectively
+	    my $useSplitChar = 0;
+	    # check for hyphens on long lines...
+	    if ( $i <= 0 && $lLen > $screenWidth ) {
+		$i = rindex($p,'-',$screenWidth-1);
+		$useSplitChar = 1;
+	    }
+	    # / good to check for URLs
+	    if ( $i <= 0 && $lLen > $screenWidth ) {
+		$i = rindex($p,'/',$screenWidth-1);
+		$useSplitChar = 1;
+	    }
+	    # ,
+	    if ( $i <= 0 && $lLen > $screenWidth ) {
+		$i = rindex($p,',',$screenWidth-1);
+		$useSplitChar = 1;
+	    }
+	    # if couldn't split, display the long line and split on screenWidth
+	    if ( $i <= 0 ) {
+		print "Long line: $p\n";
+		$i = $screenWidth - 1;
+		$lLen = $lLen - $i;
+	    } else {
+		$lLen = $lLen - $i - 1;
+	    }
+	    # split the string and add to text
+	    my $pAdd = substr($p,0,$i+$useSplitChar).$newLine;
+	    # check for page boundary on non-whitespace row
+	    if ( $pAdd =~ /\S/ && $row >= $screenHeight ) {
+		&AddPage($pageCurrent);
+		$pageCurrent = '';
+		$row = 0;
+	    }
+	    $pageCurrent .= $pAdd;
+	    $row++;
+	    # remove last line from remaining line string
+	    $p = substr($p,$i+1);
+	}
+	# check for page boundary on non-whitespace row
+	if ( $p =~ /\S/ && $row >= $screenHeight ) {
+	    &AddPage($pageCurrent);
+	    $pageCurrent = '';
+	    $row = 0;
+	}
+	$pageCurrent .= $p . $newLine;
+	$row++;
+    }
+    # add unfinished page if has non-whitespace
+    if ( $row > 0 && $pageCurrent =~ /\S/ ) {
+	&AddPage($pageCurrent);
+    }
+
+    # add this chapter if we at least added one page
+    if ( $page != $pagesChapters[$#pagesChapters] ) {
+	push @pagesChapters, $page;
+    }
+}
+
+sub AddPage {
+    foreach my $textPage (@_) {
+	# always add the text
+	my $textPageLength = length($textPage);
+	$text .= $textPage;
+	$offset += $textPageLength;
+	# only add pages with non-whitespace
+	if ( $textPage =~ /\S/ ) {
+	    push @offsetsPages, $offset;
+	    $page++;
+	}
+    }
+}

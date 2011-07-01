@@ -1,0 +1,11 @@
+#scdbook settitle(SCDBook Instruction Manual)
+#scdbook setauthor(bgvanbur)
+#scdbook setpublished(2011)
+
+SCDBook Instruction Manual
+
+Book Selection Menu: Use the down or up buttons to move the cursor down or up to select a different book. Use the right or left buttons to select another page of book choices. To open the currently selected book, use the Start, A, B, or C buttons.
+
+Book Navigation: Use the right or left buttons to naviate the pages of the book. Hold the C button while pressing the right or left buttons to naviate the chapters of the book. Use the start button to bring up an options dialog.
+
+Book Options Menu: Use the right or left buttons to pick a different text colors. Use the A button to return to the book selection menu. Use the C button to close the book options menu and return to the book.
