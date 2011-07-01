@@ -18,8 +18,9 @@ Vectors:	dc.l $FFFE00, EntryPoint, BusError, AddressError
 
 Console:	dc.b "SEGA GENESIS    " ; Hardware system ID
 Date:		dc.b "(C)T-BV 2011.JUN" ; Release date
-Title_Local:	dc.b "SCDBook ROM: Alice",$27,"s Adventures in Wonderland   " ; Domestic name
-Title_Int:	dc.b "SCDBook ROM: Alice",$27,"s Adventures in Wonderland   " ; Domestic name
+	;; TODO add book title to title
+Title_Local:	dc.b "SCDBook ROM                                     " ; Domestic name
+Title_Int:	dc.b "SCDBook ROM                                     " ; Domestic name
 Serial:		dc.b "GM T-00005 -00"   ; Serial/version number
 Checksum:	dc.w 0
 		dc.b "J               " ; I/O support
