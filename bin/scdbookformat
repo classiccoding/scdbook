@@ -348,6 +348,10 @@ my $pages = $#offsetsPages;
 open( ASM, '>'.$fileAsm );
 
 print ASM "${prefix}BookDataStart:\n";
+print ASM "\t;; BookDataType\n";
+print ASM "\tdc.b\t0\n";
+print ASM "\t;; BookDataVersion\n";
+print ASM "\tdc.b\t0\n";
 
 my $length = 0;
 
@@ -472,6 +476,11 @@ sub AddChapter {
 	    $row++;
 	    # remove last line from remaining line string
 	    $p = substr($p,$i+1);
+	    # remove preceeding whitespace
+	    # (such as two spaces at the end of a sentence)
+	    if ( $p =~ s/^\s+// ) {
+		$lLen = length($p);
+	    }
 	}
 	# check for page boundary on non-whitespace row
 	if ( $p =~ /\S/ && $row >= $screenHeight ) {

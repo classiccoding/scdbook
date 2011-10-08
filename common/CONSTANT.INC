@@ -2,17 +2,22 @@
 BookDataStart:				equ	$00200000
 	;; where the book data is loaded on the sub CPU
 SCDBookDataStart:			equ	$00080000
+	;; fixed offsets for book type and version
+BookDataType:				equ	0
+BookDataVersion:			equ	1
 	;; fixed offsets for book data
-BookDataBookIndex:			equ	0
-BookDataBookPart:			equ	2
-BookDataPageTableOffset:		equ	4
-BookDataTextTableSectorOffset:		equ	6
-BookDataChapterCount:			equ	8
-BookDataPageCount:			equ	10
-BookDataChapterTableStart:		equ	12
+BookDataBookIndex:			equ	2
+BookDataBookPart:			equ	4
+BookDataPageTableOffset:		equ	6
+BookDataTextTableSectorOffset:		equ	8
+BookDataChapterCount:			equ	10
+BookDataPageCount:			equ	12
+BookDataChapterTableStart:		equ	14
 	;; fixed offsets for TOC data
-TOCDataPageTableOffset:			equ	0
-TOCDataTextTableByteStart:		equ	2
+TOCDataPageTableOffset:			equ	2
+TOCDataTextTableByteStart:		equ	4
+	;; fixed offsets for book executable
+ExecutableOffset:			equ	2
 	;; SCD initialize/nop command
 SCDCommandInitialize:			equ	$01
 SCDCommandNop:				equ	$01
