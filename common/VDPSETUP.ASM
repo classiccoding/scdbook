@@ -79,7 +79,7 @@ EndVDPSetup:
 StartInitialPalette:
 	dc.w	$000,$CCC,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 	dc.w	$000,$666,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	include	SCDBPAL.ASM
+	incbin	SCDBPAL.BIN
 EndInitialPalette:	
 
 EndOfFileVDPSetup:
