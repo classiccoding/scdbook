@@ -3,5 +3,5 @@ StartBookInfo:
 	include	PG11.ASM
 StartBookText:
 	incbin	PG11.TXT
-	even
+	;; no need for even since scdbookformat forces text to be even length
 	include ROMEND.ASM

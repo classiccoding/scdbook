@@ -42,7 +42,7 @@ VintUpdatePort:
         nop
         move.b   (a0),d1
 	;; d1 has XXSARLDU
-	and.b    #$30,d1
+	andi.b   #$30,d1
         lsl.b    #2,d1
 	or.b     d1,d0
         not.b    d0

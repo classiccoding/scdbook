@@ -141,7 +141,6 @@ TOCEndInfo:
 
 TOCStartText:
 	incbin	TOC.TXT
-TOCEndText:
-	even
+	;; no need for even since scdbookformat forces text to be even length
 
 MainMenuStart:	

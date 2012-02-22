@@ -416,6 +416,14 @@ print ASM "${prefix}BookDataEnd:\n";
 
 close ASM;
 
+# ensure file has an even length
+if ( length($text) & 1 ) {
+    if ( ( length($newLine) & 1 ) == 0 ) {
+	$text .= ' ';
+    }
+    $text .= $newLine;
+}
+
 open( TEXT, '>'.$fileText );
 print TEXT $text;
 close TEXT;

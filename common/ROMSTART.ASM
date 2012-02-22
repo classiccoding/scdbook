@@ -17,7 +17,7 @@ Vectors:	dc.l $FFFE00, EntryPoint, BusError, AddressError
 		dc.l ErrorTrap,	ErrorTrap, ErrorTrap, ErrorTrap
 
 Console:	dc.b "SEGA GENESIS    " ; Hardware system ID
-Date:		dc.b "(C)T-BV 2011.JUN" ; Release date
+		dc.b "(C)T-BV 2011.JUN" ; Release date
 	;; TODO add book title to title
 Title_Local:	dc.b "SCDBook ROM                                     " ; Domestic name
 Title_Int:	dc.b "SCDBook ROM                                     " ; Domestic name
