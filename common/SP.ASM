@@ -18,7 +18,7 @@ DataHeaderBufferOffset:		equ	18
 StartSCD:	
 	;; 11 character string, start with MAIN or ends with SYS, SUB, or DAT
 	;; null terminated string
-	dc.b    'MAIN       ',$00
+	dc.b    "MAIN       ",$00
 	;; version
 	dc.w    $0000
 	;; type
@@ -236,7 +236,6 @@ DataHeaderBuffer:
 	dc.l	0
 DataBackUpInit:
 	dc.w	0
-	even
 StartBackUpScratch:
 	
 EndSCD:	

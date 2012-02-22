@@ -51,30 +51,38 @@ InitialTileCopy:
 
 StartVDPSetup:
 	;; based on sonic 1 vdp init
-	dc.b $04		; VDP $80 - 8-colour mode
-	dc.b $04		; VDP $81 - Megadrive mode, DMA disable
-	dc.b ($C000>>10)	; VDP $82 - foreground nametable address
-	dc.b ($F000>>10)	; VDP $83 - window nametable address
-	dc.b ($E000>>13)	; VDP $84 - background nametable address
-	dc.b ($D800>>9)		; VDP $85 - sprite table address
-	dc.b 0			; VDP $86 - unused
-	dc.b 0			; VDP $87 - background colour
-	dc.b 0			; VDP $88 - unused
-	dc.b 0			; VDP $89 - unused
-	dc.b 255		; VDP $8A - HBlank register
-	dc.b $00		; VDP $8B - full v scroll, cell h scroll
-	dc.b $81		; VDP $8C - 40 cell display
-	dc.b ($DC00>>10)	; VDP $8D - hscroll table address
-	dc.b 0			; VDP $8E - unused
-	dc.b 1			; VDP $8F - VDP increment
-	dc.b 1			; VDP $90 - 64 cell hscroll size
-	dc.b 0			; VDP $91 - window h position
-	dc.b 0			; VDP $92 - window v position
-EndVDPSetup:
-	;; actually putting a zero byte here to keep old asmx compatible
-	dc.b 0
-	;; keeping even as a sanity check
-	even
+	; VDP $80 - 8-colour mode
+	; VDP $81 - Megadrive mode, DMA disable
+	dc.b $04,$04
+	; VDP $82 - foreground nametable address
+	; VDP $83 - window nametable address
+	dc.b ($C000>>10),($F000>>10)
+	; VDP $84 - background nametable address
+	; VDP $85 - sprite table address
+	dc.b ($E000>>13),($D800>>9)
+	; VDP $86 - unused
+	; VDP $87 - background colour
+	dc.b 0,0
+	; VDP $88 - unused
+	; VDP $89 - unused
+	dc.b 0,0
+	; VDP $8A - HBlank register
+	; VDP $8B - full v scroll, cell h scroll
+	dc.b $FF,$00
+	; VDP $8C - 40 cell display
+	; VDP $8D - hscroll table address
+	dc.b $81,($DC00>>10)
+	; VDP $8E - unused
+	; VDP $8F - VDP increment
+	dc.b 0,1
+	; VDP $90 - 64 cell hscroll size
+	; VDP $91 - window h position
+	dc.b 1,0
+	; VDP $92 - window v position
+	; unused byte
+	dc.b 0,0
+EndVDPSetupEven:
+EndVDPSetup:	equ	EndVDPSetupEven-1
 
 StartInitialPalette:
 	dc.w	$000,$CCC,0,0,0,0,0,0,0,0,0,0,0,0,0,0

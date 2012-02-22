@@ -138,7 +138,6 @@ MainMenuUpdateSelectionLoadTOCPage:
 TOCStartInfo:
 	include	TOC.ASM
 TOCEndInfo:
-	even
 
 TOCStartText:
 	incbin	TOC.TXT

@@ -348,10 +348,8 @@ my $pages = $#offsetsPages;
 open( ASM, '>'.$fileAsm );
 
 print ASM "${prefix}BookDataStart:\n";
-print ASM "\t;; BookDataType\n";
-print ASM "\tdc.b\t0\n";
-print ASM "\t;; BookDataVersion\n";
-print ASM "\tdc.b\t0\n";
+print ASM "\t;; BookDataType,BookDataVersion\n";
+print ASM "\tdc.b\t0,0\n";
 
 my $length = 0;
 
